@@ -1,3 +1,138 @@
+name: CI - Build wxPython (Practically Perfect in Every Way)
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build wxPython (A Spoonful of Sugar Edition)
+    runs-on: x86_64_monterey
+    if: github.repository_owner == 'alexofficial4493'
+
+    env:
+      # GitHub Information
+      branch: ${{ github.ref }}
+      commiturl: ${{ github.event.head_commit.url }}${{ github.event.release.html_url }}
+      commitdate: ${{ github.event.head_commit.timestamp }}${{ github.event.release.published_at }}
+
+      # Analytics
+      ANALYTICS_KEY: ${{ secrets.ANALYTICS_KEY }}
+      ANALYTICS_SITE: ${{ secrets.ANALYTICS_SITE }}
+
+      # App Signing
+      ORG_MAC_DEVELOPER_ID_APPLICATION_IDENTITY: ${{ secrets.ORG_MAC_DEVELOPER_ID_APPLICATION_IDENTITY }}
+
+      # PKG Signing
+      ORG_MAC_DEVELOPER_ID_INSTALLER_IDENTITY: ${{ secrets.ORG_MAC_DEVELOPER_ID_INSTALLER_IDENTITY }}
+
+      # Notarization
+      ORG_MAC_NOTARIZATION_TEAM_ID: ${{ secrets.ORG_MAC_NOTARIZATION_TEAM_ID }}
+      ORG_MAC_NOTARIZATION_APPLE_ID: ${{ secrets.ORG_MAC_NOTARIZATION_APPLE_ID }}
+      ORG_MAC_NOTARIZATION_PASSWORD: ${{ secrets.ORG_MAC_NOTARIZATION_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out the repo (spit spot!)
+
+      - name: Install Python Requirements (Just a Spoonful of Pip)
+        run: |
+          echo "✨ Installing dependencies to make the magic happen ✨"
+          /Library/Frameworks/Python.framework/Versions/3.11/bin/python3 -m pip install --upgrade pip
+          /Library/Frameworks/Python.framework/Versions/3.11/bin/python3 -m pip install -r requirements.txt
+          echo "✅ Requirements installed — practically perfect in every way."
+
+      # - name: Import Application Signing Certificate
+      #   uses: dhinakg/import-codesign-certs@master
+      #   with:
+      #     p12-file-base64: ${{ secrets.ORG_MAC_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64 }}
+      #     p12-password: ${{ secrets.ORG_MAC_DEVELOPER_ID_APPLICATION_CERT_P12_PASSWORD }}
+
+      # - name: Import Installer Signing Certificate
+      #   uses: dhinakg/import-codesign-certs@master
+      #   with:
+      #     p12-file-base64: ${{ secrets.ORG_MAC_DEVELOPER_ID_INSTALLER_CERT_P12_BASE64 }}
+      #     p12-password: ${{ secrets.ORG_MAC_DEVELOPER_ID_INSTALLER_CERT_P12_PASSWORD }}
+
+      - name: Prepare Assets (--prepare-assets)
+        run: >
+          echo "☂️ Gathering the carpetbag and umbrella..."
+          /Library/Frameworks/Python.framework/Versions/3.11/bin/python3 Build-Project.command
+          --run-as-individual-steps --reset-dmg-cache
+          --prepare-assets
+          && echo "🪄 Assets prepared — spick and span!"
+
+      - name: Prepare Application (--prepare-application)
+        run: >
+          echo "🎶 Chim chim cher-ee, building the app with glee..."
+          /Library/Frameworks/Python.framework/Versions/3.11/bin/python3 Build-Project.command
+          --application-signing-identity "${{ env.ORG_MAC_DEVELOPER_ID_APPLICATION_IDENTITY }}"
+          --notarization-apple-id "${{ env.ORG_MAC_NOTARIZATION_APPLE_ID }}" --notarization-password "${{ env.ORG_MAC_NOTARIZATION_PASSWORD }}" --notarization-team-id "${{ env.ORG_MAC_NOTARIZATION_TEAM_ID }}"
+          --git-branch "${{ env.branch }}" --git-commit-url "${{ env.commiturl }}" --git-commit-date "${{ env.commitdate }}"
+          --analytics-key "${{ env.ANALYTICS_KEY }}" --analytics-endpoint "${{ env.ANALYTICS_SITE }}"
+          --reset-pyinstaller-cache
+          --run-as-individual-steps
+          --prepare-application
+          && echo "💫 Application built and polished till it shines!"
+
+      - name: Prepare Package (--prepare-package)
+        run: >
+          echo "🧳 Tucking everything neatly into the package..."
+          /Library/Frameworks/Python.framework/Versions/3.11/bin/python3 Build-Project.command
+          --installer-signing-identity "${{ env.ORG_MAC_DEVELOPER_ID_INSTALLER_IDENTITY }}"
+          --notarization-apple-id "${{ env.ORG_MAC_NOTARIZATION_APPLE_ID }}" --notarization-password "${{ env.ORG_MAC_NOTARIZATION_PASSWORD }}" --notarization-team-id "${{ env.ORG_MAC_NOTARIZATION_TEAM_ID }}"
+          --run-as-individual-steps
+          --prepare-package
+          && echo "🎩 Package ready — shipshape and Bristol fashion!"
+
+      - name: Upload AutoPkg Package to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoPkg-Assets.pkg
+          path: ./dist/AutoPkg-Assets.pkg
+
+      - name: Upload Installation Package to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCore-Patcher.pkg
+          path: ./dist/OpenCore-Patcher.pkg
+
+      - name: Upload Uninstaller Package to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenCore-Patcher-Uninstaller.pkg
+          path: ./dist/OpenCore-Patcher-Uninstaller.pkg
+
+      - name: Upload AutoPkg Package to Release
+        if: github.event_name == 'release'
+        uses: svenstaro/upload-release-action@e74ff71f7d8a4c4745b560a485cc5fdb9b5b999d
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./dist/AutoPkg-Assets.pkg
+          tag: ${{ github.ref }}
+          file_glob: true
+
+      - name: Upload Installation Package to Release
+        if: github.event_name == 'release'
+        uses: svenstaro/upload-release-action@e74ff71f7d8a4c4745b560a485cc5fdb9b5b999d
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./dist/OpenCore-Patcher.pkg
+          tag: ${{ github.ref }}
+          file_glob: true
+
+      - name: Upload Uninstaller Package to Release
+        if: github.event_name == 'release'
+        uses: svenstaro/upload-release-action@e74ff71f7d8a4c4745b560a485cc5fdb9b5b999d
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./dist/OpenCore-Patcher-Uninstaller.pkg
+          tag: ${{ github.ref }}
+          file_glob: true
 name: CI - Build wxPython
 
 on:
