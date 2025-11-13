@@ -11,14 +11,14 @@ on:
 jobs:
   build:
     name: Build wxPython (A Spoonful of Sugar Edition)
-    runs-on: macos-13  # GitHub-hosted macOS runner
+    runs-on: macos-13
     if: github.repository_owner == 'alexofficial4493'
 
     env:
       # GitHub Information
       branch: ${{ github.ref }}
-      commiturl: ${{ github.event.head_commit.url }}${{ github.event.release.html_url }}
-      commitdate: ${{ github.event.head_commit.timestamp }}${{ github.event.release.published_at }}
+      commiturl: ${{ github.event.head_commit.url || github.event.release.html_url }}
+      commitdate: ${{ github.event.head_commit.timestamp || github.event.release.published_at }}
 
       # Analytics
       ANALYTICS_KEY: ${{ secrets.ANALYTICS_KEY }}
@@ -91,38 +91,3 @@ jobs:
       - name: Upload Installation Package to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: OpenCore-Patcher.pkg
-          path: ./dist/OpenCore-Patcher.pkg
-
-      - name: Upload Uninstaller Package to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenCore-Patcher-Uninstaller.pkg
-          path: ./dist/OpenCore-Patcher-Uninstaller.pkg
-
-      - name: Upload AutoPkg Package to Release
-        if: github.event_name == 'release'
-        uses: svenstaro/upload-release-action@e74ff71f7d8a4c4745b560a485cc5fdb9b5b999d
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./dist/AutoPkg-Assets.pkg
-          tag: ${{ github.ref }}
-          file_glob: true
-
-      - name: Upload Installation Package to Release
-        if: github.event_name == 'release'
-        uses: svenstaro/upload-release-action@e74ff71f7d8a4c4745b560a485cc5fdb9b5b999d
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./dist/OpenCore-Patcher.pkg
-          tag: ${{ github.ref }}
-          file_glob: true
-
-      - name: Upload Uninstaller Package to Release
-        if: github.event_name == 'release'
-        uses: svenstaro/upload-release-action@e74ff71f7d8a4c4745b560a485cc5fdb9b5b999d
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./dist/OpenCore-Patcher-Uninstaller.pkg
-          tag: ${{ github.ref }}
-          file_glob: true
